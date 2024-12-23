@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WikiChat - Multi-Personality AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .chat-container {
+            height: 70vh;
+            overflow-y: auto;
+        }
+        .message {
+            margin: 10px;
+            padding: 15px;
+            border-radius: 15px;
+            max-width: 85%;
+            animation: fadeIn 0.3s ease-in;
+        }
+        .user-message {
+            background-color: #e2e8f0;
+            margin-left: auto;
+        }
+        .bot-message {
+            background-color: #3b82f6;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .personality-card {
+            transition: all 0.3s ease;
+        }
+        .personality-card:hover {
+            transform: translateY(-2px);
+        }
+        .personality-card.selected {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4 max-w-4xl">
+        <h1 class="text-3xl font-bold text-center mb-6">WikiChat AI</h1>
+        
+        <!-- Personality Selector -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {% for key, personality in personalities.items() %}
+            <div class="personality-card cursor-pointer border-2 rounded-lg p-3 text-center"
+                 data-personality="{{ key }}"
+                 onclick="selectPersonality(this, '{{ key }}')">
+                <h3 class="font-semibold">{{ personality.name }}</h3>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Chat Container -->
+        <div class="bg-white rounded-lg shadow-lg p-4">
+            <div id="chat-messages" class="chat-container mb-4">
+                <div class="bot-message message">
+                    Welcome to WikiChat! I can explain any topic in different styles. Choose a personality above and ask me anything! 🌟
+                </div>
+            </div>
+
+            <!-- Input Form -->
+            <form id="chat-form" class="flex gap-2">
+                <input type="text" 
+                       id="user-input" 
+                       class="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Type your question...">
+                <button type="submit" 
+                        class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                    Send
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const chatMessages = document.getElementById('chat-messages');
+        let currentPersonality = 'friendly';
+
+        function selectPersonality(element, personality) {
+            // Remove selected class from all cards
+            document.querySelectorAll('.personality-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            // Add selected class to clicked card
+            element.classList.add('selected');
+            currentPersonality = personality;
+        }
+
+        // Select default personality
+        document.querySelector(`[data-personality="friendly"]`).classList.add('selected');
+
+        function addMessage(message, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            messageDiv.textContent = message;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, true);
+            userInput.value = '';
+            userInput.focus();
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        personality: currentPersonality
+                    }),
+                });
+
+                const data = await response.json();
+                addMessage(data.response);
+            } catch (error) {
+                addMessage('Sorry, something went wrong. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html>
