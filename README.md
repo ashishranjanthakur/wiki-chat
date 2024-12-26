@@ -1,31 +1,24 @@
-# WikiChat - Intelligent Multi-Personality Chatbot
+# Wiki Chat Application
 
-A Flask-based chatbot that combines Wikipedia knowledge, web search, and multiple personalities to create engaging and informative conversations.
+A Flask-based web application that allows users to chat with Wikipedia content using a natural language interface.
 
 ## Features
+- Interactive chat interface
+- Wikipedia content search and retrieval
+- Natural language processing for better understanding
+- Real-time responses
 
-- **Multiple AI Personalities**:
-  - Friendly Guide: Casual and approachable responses
-  - Professor: Academic and detailed explanations
-  - Personal Assistant: Professional and helpful answers
+## Tech Stack
+- Python 3.9
+- Flask 3.0.0
+- Wikipedia-API
+- BeautifulSoup4
+- Gunicorn (for production deployment)
 
-- **Smart Information Retrieval**:
-  - Wikipedia integration for factual queries
-  - Web search capabilities for current information
-  - Time-based responses and greetings
-
-- **Query Types Supported**:
-  - Factual questions (What is, Who was, etc.)
-  - Current events and news
-  - How-to questions
-  - Time queries
-  - Greetings
-
-## Installation
-
+## Local Development
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/wiki-chat.git
+git clone https://github.com/ashishranjanthakur/wiki-chat.git
 cd wiki-chat
 ```
 
@@ -34,51 +27,13 @@ cd wiki-chat
 pip install -r requirements.txt
 ```
 
-## Running the Application
-
-1. Start the Flask application:
+3. Run the development server:
 ```bash
 python app.py
 ```
 
-2. Open your browser and go to `http://localhost:5000`
-
-## Usage
-
-1. Select a personality from the available options
-2. Type your question in the chat input
-3. Examples of questions you can ask:
-   - "What is artificial intelligence?"
-   - "How does photosynthesis work?"
-   - "Latest news in technology"
-   - "What time is it?"
-   - "How to learn programming?"
-
-## Technologies Used
-
-- **Backend**:
-  - Flask (Web Framework)
-  - Wikipedia-API (Knowledge Base)
-  - BeautifulSoup4 (Web Scraping)
-  - Requests (HTTP Client)
-  - Pytz (Timezone Handling)
-
-- **Frontend**:
-  - HTML/CSS
-  - JavaScript
-  - Modern responsive design
-
-## Project Structure
-
-- `app.py`: Main application file
-- `requirements.txt`: Project dependencies
-- `templates/`: HTML templates
-- `.env`: Environment variables (not tracked in git)
-
-## Contributing
-
-Feel free to open issues or submit pull requests to improve the project.
+## Production Deployment
+This application is configured for deployment on Render.com. The necessary configuration files (`render.yaml`, `Procfile`, and `gunicorn_config.py`) are included in the repository.
 
 ## License
-
-MIT License - feel free to use and modify for your own projects!
+MIT License
