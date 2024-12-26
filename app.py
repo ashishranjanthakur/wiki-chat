@@ -104,56 +104,84 @@ PERSONALITIES = {
 def search_web(query):
     """Search the web for information"""
     try:
-        # First try Wikipedia search
-        search_url = f"https://en.wikipedia.org/w/api.php"
-        params = {
-            "action": "query",
-            "format": "json",
-            "list": "search",
-            "srsearch": query,
-            "utf8": 1
-        }
+        # Try Wikipedia first
+        wiki_response = get_wiki_response(query)
+        if wiki_response[0]:
+            return wiki_response[0]
+
+        # If Wikipedia fails, try a web search
+        search_url = f"https://api.duckduckgo.com/?q={query}&format=json"
+        response = requests.get(search_url)
+        data = json.loads(response.text)
         
-        response = requests.get(search_url, params=params)
-        data = response.json()
+        # Check for instant answer
+        if data.get('AbstractText'):
+            return data['AbstractText']
         
-        if "query" in data and "search" in data["query"]:
-            results = []
-            for result in data["query"]["search"][:2]:  # Get top 2 results
-                title = result["title"]
-                snippet = BeautifulSoup(result["snippet"], "html.parser").get_text()
-                results.append(f"{snippet}")
-            
-            if results:
-                return ' '.join(results)
-        
-        # If Wikipedia search fails, try general web search
-        search_term = query.replace(' ', '+')
-        url = f"https://www.google.com/search?q={search_term}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        
-        response = requests.get(url, headers=headers)
+        # Check for related topics
+        if data.get('RelatedTopics'):
+            topics = []
+            for topic in data['RelatedTopics'][:2]:
+                if isinstance(topic, dict) and 'Text' in topic:
+                    topics.append(topic['Text'])
+            if topics:
+                return ' '.join(topics)
+
+        # Fallback to simple web search
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        search_url = f"https://html.duckduckgo.com/html/?q={query}"
+        response = requests.get(search_url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Find search result divs
-        search_results = soup.find_all('div', class_='BNeawe s3v9rd AP7Wnd')
+        # Get search results
+        results = []
+        for result in soup.select('.result__body')[:2]:
+            text = result.get_text().strip()
+            if text:
+                results.append(text)
         
-        if search_results:
-            results = []
-            for result in search_results[:2]:
-                text = result.get_text()
-                if len(text) > 50:  # Only include substantial results
-                    results.append(text)
-            
-            if results:
-                return ' '.join(results)
+        if results:
+            return ' '.join(results)
 
     except Exception as e:
-        logger.error(f"Search error: {str(e)}", exc_info=True)
+        logger.error(f"Search error: {str(e)}")
         return None
     return None
+
+def get_wiki_response(query):
+    """Get response from Wikipedia"""
+    try:
+        page = wiki.page(query)
+        if not page.exists():
+            return None, None
+        
+        summary = page.summary.split('. ')
+        main_info = '. '.join(summary[:2]) + '.'
+        
+        if len(summary) > 2:
+            additional_info = '. '.join(summary[2:4]) + '.'
+            return main_info, additional_info
+        
+        return main_info, None
+    except Exception as e:
+        logger.error(f"Wikipedia error: {str(e)}")
+        return None, None
+
+def clean_response(text):
+    """Clean and format the response text"""
+    if not text:
+        return text
+    
+    # Remove URLs
+    text = re.sub(r'http\S+|www.\S+', '', text)
+    # Remove special characters but keep basic punctuation
+    text = re.sub(r'[^\w\s.,!?-]', '', text)
+    # Remove extra whitespace
+    text = ' '.join(text.split())
+    # Ensure the text ends with proper punctuation
+    if text and text[-1] not in '.!?':
+        text += '.'
+    return text
 
 def is_factual_query(query):
     """Check if the query is likely to be answered well by Wikipedia"""
@@ -177,11 +205,6 @@ def is_time_query(query):
     time_keywords = ['time', 'current time', 'what time', 'tell me the time']
     return any(keyword in query.lower() for keyword in time_keywords)
 
-def is_greeting(query):
-    """Check if query is a greeting"""
-    greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening']
-    return any(greeting in query.lower() for greeting in greetings)
-
 def handle_time_query():
     """Handle time-related queries"""
     current_time = get_current_time()
@@ -192,57 +215,6 @@ def handle_greeting():
     greeting = get_time_based_greeting()
     current_time = get_current_time()
     return f"{greeting}! It's currently {current_time}."
-
-def get_wiki_response(query):
-    """Get response from Wikipedia"""
-    try:
-        # Search for the page
-        search_query = query.replace(" ", "_")
-        page = wiki.page(search_query)
-        
-        if not page.exists():
-            # Try searching with spaces
-            page = wiki.page(query)
-            if not page.exists():
-                return None, None
-        
-        # Get the summary and sections
-        main_info = page.summary
-        if not main_info:
-            return None, None
-            
-        # Get additional information from sections if available
-        sections = page.sections
-        additional_info = ""
-        if sections:
-            first_section = sections[0]
-            additional_info = first_section.text[:500] if first_section.text else ""
-            
-        if main_info:
-            # Limit the length of main_info
-            main_info = main_info[:500] + "..." if len(main_info) > 500 else main_info
-            return main_info, additional_info
-        
-        return main_info, None
-    except Exception as e:
-        logger.error(f"Wikipedia error: {str(e)}", exc_info=True)
-        return None, None
-
-def clean_response(text):
-    """Clean and format the response text"""
-    if not text:
-        return text
-    
-    # Remove URLs
-    text = re.sub(r'http\S+|www.\S+', '', text)
-    # Remove special characters but keep basic punctuation
-    text = re.sub(r'[^\w\s.,!?-]', '', text)
-    # Remove extra whitespace
-    text = ' '.join(text.split())
-    # Ensure the text ends with proper punctuation
-    if text and text[-1] not in '.!?':
-        text += '.'
-    return text
 
 def format_response(query, personality_key):
     """Format response based on query type and personality"""
@@ -283,7 +255,7 @@ def format_response(query, personality_key):
 
 @app.route('/')
 def home():
-    return render_template('index.html', personalities=PERSONALITIES)
+    return render_template('index.html')
 
 @app.route('/chat', methods=['POST'])
 def chat():
