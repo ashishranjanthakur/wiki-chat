@@ -9,7 +9,7 @@ A Flask-based web application that allows users to chat with Wikipedia content u
 - Real-time responses
 
 ## Tech Stack
-- Python 3.9
+- Python 3.10
 - Flask 3.0.0
 - Wikipedia-API
 - BeautifulSoup4
@@ -38,7 +38,7 @@ This application is configured for deployment on PythonAnywhere. Follow these st
 1. Create a free account on [PythonAnywhere](https://www.pythonanywhere.com)
 2. Go to the "Web" tab and create a new web app
 3. Choose "Flask" as your framework
-4. Set the Python version to 3.9
+4. Set the Python version to 3.10
 5. In the "Code" section:
    ```bash
    git clone https://github.com/ashishranjanthakur/wiki-chat.git
