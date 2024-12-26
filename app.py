@@ -7,8 +7,13 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import json
+import logging
 
 app = Flask(__name__)
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize Wikipedia API
 wiki = wikipediaapi.Wikipedia(
@@ -99,47 +104,54 @@ PERSONALITIES = {
 def search_web(query):
     """Search the web for information"""
     try:
-        # Try Wikipedia first
-        wiki_response = get_wiki_response(query)
-        if wiki_response[0]:
-            return wiki_response[0]
-
-        # If Wikipedia fails, try a web search
-        search_url = f"https://api.duckduckgo.com/?q={query}&format=json"
-        response = requests.get(search_url)
-        data = json.loads(response.text)
+        # First try Wikipedia search
+        search_url = f"https://en.wikipedia.org/w/api.php"
+        params = {
+            "action": "query",
+            "format": "json",
+            "list": "search",
+            "srsearch": query,
+            "utf8": 1
+        }
         
-        # Check for instant answer
-        if data.get('AbstractText'):
-            return data['AbstractText']
+        response = requests.get(search_url, params=params)
+        data = response.json()
         
-        # Check for related topics
-        if data.get('RelatedTopics'):
-            topics = []
-            for topic in data['RelatedTopics'][:2]:
-                if isinstance(topic, dict) and 'Text' in topic:
-                    topics.append(topic['Text'])
-            if topics:
-                return ' '.join(topics)
-
-        # Fallback to simple web search
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        search_url = f"https://html.duckduckgo.com/html/?q={query}"
-        response = requests.get(search_url, headers=headers)
+        if "query" in data and "search" in data["query"]:
+            results = []
+            for result in data["query"]["search"][:2]:  # Get top 2 results
+                title = result["title"]
+                snippet = BeautifulSoup(result["snippet"], "html.parser").get_text()
+                results.append(f"{snippet}")
+            
+            if results:
+                return ' '.join(results)
+        
+        # If Wikipedia search fails, try general web search
+        search_term = query.replace(' ', '+')
+        url = f"https://www.google.com/search?q={search_term}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Get search results
-        results = []
-        for result in soup.select('.result__body')[:2]:
-            text = result.get_text().strip()
-            if text:
-                results.append(text)
+        # Find search result divs
+        search_results = soup.find_all('div', class_='BNeawe s3v9rd AP7Wnd')
         
-        if results:
-            return ' '.join(results)
+        if search_results:
+            results = []
+            for result in search_results[:2]:
+                text = result.get_text()
+                if len(text) > 50:  # Only include substantial results
+                    results.append(text)
+            
+            if results:
+                return ' '.join(results)
 
     except Exception as e:
-        print(f"Search error: {str(e)}")
+        logger.error(f"Search error: {str(e)}", exc_info=True)
         return None
     return None
 
@@ -184,19 +196,36 @@ def handle_greeting():
 def get_wiki_response(query):
     """Get response from Wikipedia"""
     try:
-        page = wiki.page(query)
+        # Search for the page
+        search_query = query.replace(" ", "_")
+        page = wiki.page(search_query)
+        
         if not page.exists():
+            # Try searching with spaces
+            page = wiki.page(query)
+            if not page.exists():
+                return None, None
+        
+        # Get the summary and sections
+        main_info = page.summary
+        if not main_info:
             return None, None
-        
-        summary = page.summary.split('. ')
-        main_info = '. '.join(summary[:2]) + '.'
-        
-        if len(summary) > 2:
-            additional_info = '. '.join(summary[2:4]) + '.'
+            
+        # Get additional information from sections if available
+        sections = page.sections
+        additional_info = ""
+        if sections:
+            first_section = sections[0]
+            additional_info = first_section.text[:500] if first_section.text else ""
+            
+        if main_info:
+            # Limit the length of main_info
+            main_info = main_info[:500] + "..." if len(main_info) > 500 else main_info
             return main_info, additional_info
         
         return main_info, None
-    except Exception:
+    except Exception as e:
+        logger.error(f"Wikipedia error: {str(e)}", exc_info=True)
         return None, None
 
 def clean_response(text):
@@ -266,9 +295,12 @@ def chat():
         return jsonify({'response': 'Please ask me something!'})
     
     try:
+        logger.info(f"Received query: {query}")
         response = format_response(query, personality)
+        logger.info(f"Generated response: {response}")
         return jsonify({'response': response})
     except Exception as e:
+        logger.error(f"Error processing query: {str(e)}", exc_info=True)
         return jsonify({'response': f"Sorry, I encountered an error: {str(e)}"})
 
 if __name__ == '__main__':
